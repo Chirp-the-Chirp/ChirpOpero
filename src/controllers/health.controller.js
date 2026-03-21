@@ -1,8 +1,12 @@
 "use strict";
 
+const { createLogger } = require("../utils/logger");
+
+const logger = createLogger("HealthController");
+
 class HealthController {
     static getHealth(req, res) {
-        console.log("Hit 01");
+        logger.debug("Health endpoint hit");
         return res.json({
             message: "Jasper's Market Server is running",
             endpoints: [

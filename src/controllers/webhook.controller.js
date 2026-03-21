@@ -2,10 +2,13 @@
 
 const env = require("../config/env");
 const ConversationService = require("../services/conversation.service");
+const { createLogger } = require("../utils/logger");
+
+const logger = createLogger("WebhookController");
 
 class WebhookController {
     static verify(req, res) {
-        console.log("Webhook verification request received");
+        logger.debug("Webhook verification request received");
 
         if (
             req.query["hub.mode"] !== "subscribe" ||
@@ -18,9 +21,6 @@ class WebhookController {
     }
 
     static async handleWebhook(req, res) {
-        console.log("Webhook POST hit");
-        
-        console.log(JSON.stringify(req.body, null, 2));
 
         try {
             if (req.body.object === "whatsapp_business_account") {
@@ -50,7 +50,7 @@ class WebhookController {
 
             return res.status(200).send("EVENT_RECEIVED");
         } catch (error) {
-            console.error("Webhook processing error:", error);
+            logger.error("Webhook processing error", error);
             return res.status(500).json({
                 error: "Failed to process webhook event"
             });

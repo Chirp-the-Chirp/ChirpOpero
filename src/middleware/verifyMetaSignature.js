@@ -2,12 +2,15 @@
 
 const crypto = require("crypto");
 const env = require("../config/env");
+const { createLogger } = require("../utils/logger");
+
+const logger = createLogger("VerifyMetaSignature");
 
 function verifyMetaSignature(req, res, buf) {
     const signature = req.headers["x-hub-signature-256"];
 
     if (!signature) {
-        console.warn('Could not find "x-hub-signature-256" in headers.');
+        logger.warn('Could not find "x-hub-signature-256" in headers.');
         return;
     }
 

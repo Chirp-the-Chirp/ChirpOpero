@@ -4,6 +4,7 @@ module.exports = Object.freeze({
   USER_START_MESSAGE: "Tap send to get started",
 
   APP_DEFAULT_MESSAGE: "Welcome to Jasper's Market! What can we help you with today?",
+  APP_MESSAGE_RECEIVED: "Hello! Your Message Recieved.",
   APP_TRY_ANOTHER_MESSAGE: "Is there anything else we can help you with?",
 
   REPLY_INTERACTIVE_WITH_MEDIA_CTA: "Shop online",
