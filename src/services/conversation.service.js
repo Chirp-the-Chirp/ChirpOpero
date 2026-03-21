@@ -5,6 +5,9 @@ const GraphApiService = require("./graph-api.service");
 const Message = require("../models/message.model");
 const Status = require("../models/status.model");
 const RedisService = require("./redis.service");
+const { createLogger } = require("../utils/logger");
+
+const logger = createLogger("ConversationService");
 
 async function sendMainMenuMessage(messageId, senderPhoneNumberId, recipientPhoneNumber, messageBody) {
     return GraphApiService.messageWithInteractiveReply(
@@ -74,13 +77,31 @@ async function sendMediaCarouselMessage(messageId, senderPhoneNumberId, recipien
     );
 }
 
+async function sendTextMessage(messageId, senderPhoneNumberId, recipientPhoneNumber) {
+    const response = await GraphApiService.messageWithText(
+        messageId,
+        senderPhoneNumberId,
+        recipientPhoneNumber,
+        constants.APP_MESSAGE_RECEIVED
+    );
+
+    const followUpMessageId = response?.messages?.[0]?.id;
+    if (followUpMessageId) {
+        await markMessageForFollowUp(followUpMessageId);
+    }
+
+    return response;
+}
+
 async function markMessageForFollowUp(messageId) {
-  await RedisService.insert(messageId);
+    await RedisService.insert(messageId);
 }
 
 class ConversationService {
     static async handleMessage(senderPhoneNumberId, rawMessage) {
         const message = new Message(rawMessage);
+
+        logger.debug("Received message content", message);
 
         switch (message.type) {
         case constants.REPLY_INTERACTIVE_MEDIA_ID: {
@@ -113,19 +134,37 @@ class ConversationService {
             break;
         }
 
-        default:
-            await sendMainMenuMessage(
+        default: {
+            try {
+                await sendTextMessage(
+                    message.id,
+                    senderPhoneNumberId,
+                    message.senderPhoneNumber
+                );
+                /**
+                await sendMainMenuMessage(
                     message.id,
                     senderPhoneNumberId,
                     message.senderPhoneNumber,
                     constants.APP_DEFAULT_MESSAGE
                 );
+                 */
+            } catch (error) {
+                logger.error("Failed to send greeting + menu", {
+                    messageId: message.id,
+                    senderPhoneNumber: message.senderPhoneNumber,
+                    error
+                });
+                throw error;
+            }
             break;
+        }
         }
     }
 
     static async handleStatus(senderPhoneNumberId, rawStatus) {
         const status = new Status(rawStatus);
+        logger.debug("Status Update: ", status)
 
         if (!(status.status === "delivered" || status.status === "read")) {
             return;

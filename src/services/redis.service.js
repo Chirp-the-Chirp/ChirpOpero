@@ -2,6 +2,9 @@
 
 const redis = require("redis");
 const env = require("../config/env");
+const { createLogger } = require("../utils/logger");
+
+const logger = createLogger("RedisService");
 
 const client = redis.createClient({
     socket: {
@@ -11,7 +14,7 @@ const client = redis.createClient({
 });
 
 client.on("error", (err) => {
-    console.error("Redis Client Error:", err);
+    logger.error("Redis Client Error", err);
 });
 
 let isConnected = false;
@@ -20,7 +23,7 @@ async function connectRedis() {
     if (!isConnected) {
         await client.connect();
         isConnected = true;
-        console.log("Redis connected");
+        logger.info("Redis connected");
     }
 }
 
