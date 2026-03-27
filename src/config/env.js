@@ -2,6 +2,10 @@
 
 require("dotenv").config();
 
+const { createLogger } = require("../utils/logger");
+
+const logger = createLogger("EnvConfig");
+
 const REQUIRED_ENV_VARS = [
     "ACCESS_TOKEN",
     "APP_SECRET",
@@ -13,7 +17,7 @@ const REQUIRED_ENV_VARS = [
 function checkEnvVariables() {
     REQUIRED_ENV_VARS.forEach((key) => {
         if (!process.env[key]) {
-        console.warn(`WARNING: Missing environment variable ${key}`);
+            logger.warn(`WARNING: Missing environment variable ${key}`);
         }
     });
 }

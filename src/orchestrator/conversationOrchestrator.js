@@ -1,15 +1,21 @@
 "use strict";
 
-const { ACTIONS, SOURCES } = require("./decisionTypes");
+const { createFallbackDecision, createErrorDecision } = require("./decisionFactory");
+const preCheckStrategy = require("./strategies/preCheckStrategy");
+const stateStrategy = require("./strategies/stateStrategy");
+const ruleBasedStrategy = require("./strategies/ruleBasedStrategy");
+const faqStrategy = require("./strategies/faqStrategy");
+const ragStrategy = require("./strategies/ragStrategy");
+const llmStrategy = require("./strategies/llmStrategy");
+const humanHandoffStrategy = require("./strategies/humanHandoffStrategy");
+const templatePolicyEvaluator = require("./policies/templatePolicyEvaluator");
 const { createLogger } = require("../utils/logger");
 
 const logger = createLogger("ConversationOrchestrator");
 
-const GREETING_PHRASES = new Set(["hi", "hello"]);
-
 /**
- * Normalize orchestrator input so the rule engine can safely evaluate it.
- * @param {Object} [input={}] Raw orchestrator input payload.
+ * Normalize orchestrator input so every strategy receives the same stable payload.
+ * @param {Object} [input={}] Raw orchestrator input.
  * @returns {Object} Normalized orchestrator input.
  */
 function normalizeInput(input = {}) {
@@ -42,68 +48,91 @@ function normalizeInput(input = {}) {
 }
 
 /**
- * Build a standard reply decision for the current rule-based orchestrator.
- * @param {string} text Reply text to return.
- * @param {string} reason Human-readable explanation for logging/debugging.
- * @param {number} confidence Confidence score for the selected route.
- * @returns {Object} Structured decision payload.
+ * Create the mutable execution context shared across orchestrator strategies.
+ * @param {Object} input Normalized orchestrator input.
+ * @returns {Object} Orchestrator execution context.
  */
-function buildDecision(text, reason, confidence) {
+function createPipelineContext(input) {
     return {
-        action: ACTIONS.REPLY,
-        source: SOURCES.RULE_ENGINE,
-        response: {
-            type: "text",
-            text
-        },
-        nextState: null,
-        handoffRequired: false,
-        reason,
-        confidence
+        input
     };
 }
 
 /**
- * Decide how the system should respond based on simple rule-based routing.
- * @param {Object} input Orchestrator input payload.
- * @returns {Promise<Object>} Structured routing decision.
+ * Return the ordered strategy pipeline for deterministic-first orchestration.
+ * @returns {Array<Object>} Ordered pipeline definition.
  */
-async function orchestrate(input) {
-    const normalized = normalizeInput(input);
-    const payload = normalized.message;
-    const trimmedText = payload.text.trim();
-    const normalizedText = trimmedText.toLowerCase();
+function getStrategyPipeline() {
+    return [
+        { name: "preCheckStrategy", execute: preCheckStrategy },
+        { name: "stateStrategy", execute: stateStrategy },
+        { name: "ruleBasedStrategy", execute: ruleBasedStrategy },
+        { name: "faqStrategy", execute: faqStrategy },
+        { name: "ragStrategy", execute: ragStrategy },
+        { name: "llmStrategy", execute: llmStrategy },
+        { name: "templatePolicyEvaluator", execute: templatePolicyEvaluator },
+        { name: "humanHandoffStrategy", execute: humanHandoffStrategy }
+    ];
+}
 
-    let decision;
+/**
+ * Run the configured strategies in order until one produces a handled decision.
+ * @param {Object} context Orchestrator execution context.
+ * @returns {Promise<Object|null>} First handled decision or null.
+ */
+async function runPipeline(context) {
+    for (const strategy of getStrategyPipeline()) {
+        logger.debug("Running orchestrator strategy", {
+            strategy: strategy.name,
+            messageId: context.input.message.messageId
+        });
 
-    if (GREETING_PHRASES.has(normalizedText)) {
-        decision = buildDecision(
-            "Hey there! How can I help you today?",
-            "matched greeting",
-            0.9
-        );
-    } else if (normalizedText === "help") {
-        decision = buildDecision(
-            "Sure, I can help! Tell me what you need and I will try to guide you.",
-            "matched help request",
-            0.85
-        );
-    } else {
-        // Always return a safe fallback so downstream execution stays deterministic.
-        decision = buildDecision(
-            "Thanks for reaching out! I will get back to you shortly if needed.",
-            "fallback response",
-            0.6
-        );
+        const result = await strategy.execute(context);
+
+        if (result && result.handled) {
+            logger.debug("Strategy handled request", {
+                strategy: strategy.name,
+                messageId: context.input.message.messageId,
+                decision: result.decision
+            });
+            return result.decision;
+        }
     }
 
-    logger.debug("Orchestrator output", {
-        messageId: payload.messageId,
-        text: trimmedText,
-        decision
-    });
+    return null;
+}
 
-    return decision;
+/**
+ * Run the deterministic-first orchestration pipeline and return a decision.
+ * @param {Object} input Orchestrator input payload.
+ * @returns {Promise<Object>} Structured orchestrator decision.
+ */
+async function orchestrate(input) {
+    const normalizedInput = normalizeInput(input);
+    const context = createPipelineContext(normalizedInput);
+
+    try {
+        const decision = await runPipeline(context);
+
+        if (decision) {
+            return decision;
+        }
+
+        const fallbackDecision = createFallbackDecision();
+        logger.debug("No strategy handled request, using fallback", {
+            messageId: normalizedInput.message.messageId,
+            decision: fallbackDecision
+        });
+
+        return fallbackDecision;
+    } catch (error) {
+        logger.error("Orchestration pipeline failed", {
+            messageId: normalizedInput.message.messageId,
+            error
+        });
+
+        return createErrorDecision("orchestration pipeline failed unexpectedly");
+    }
 }
 
 module.exports = {
