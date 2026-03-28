@@ -1,6 +1,16 @@
 "use strict";
 
 const { createFallbackDecision, createErrorDecision } = require("./decisionFactory");
+const {
+    normalizeOrchestratorContext,
+    validateOrchestratorContext
+} = require("./contracts/orchestratorContext");
+const {
+    assertValidStrategyResult
+} = require("./contracts/strategyResultContract");
+const {
+    assertValidStrategyModule
+} = require("./contracts/strategyContract");
 const preCheckStrategy = require("./strategies/preCheckStrategy");
 const stateStrategy = require("./strategies/stateStrategy");
 const ruleBasedStrategy = require("./strategies/ruleBasedStrategy");
@@ -14,49 +24,9 @@ const { createLogger } = require("../utils/logger");
 const logger = createLogger("ConversationOrchestrator");
 
 /**
- * Normalize orchestrator input so every strategy receives the same stable payload.
- * @param {Object} [input={}] Raw orchestrator input.
- * @returns {Object} Normalized orchestrator input.
+ * The orchestrator owns the pipeline contract so future strategies can plug in
+ * without changing the controller or other strategies.
  */
-function normalizeInput(input = {}) {
-    const message = input.message || {};
-    const conversation = input.conversation || {};
-    const customer = input.customer || {};
-    const metadata = input.metadata || {};
-
-    return {
-        message: {
-            messageId: message.messageId || null,
-            from: message.from || null,
-            type: message.type || null,
-            text: typeof message.text === "string" ? message.text : "",
-            timestamp: message.timestamp || null
-        },
-        conversation: {
-            state: conversation.state || null,
-            lastRoute: conversation.lastRoute || null,
-            lastHandledAt: conversation.lastHandledAt || null
-        },
-        customer: {
-            customerId: customer.customerId || null,
-            name: customer.name || null
-        },
-        metadata: {
-            channel: metadata.channel || "whatsapp"
-        }
-    };
-}
-
-/**
- * Create the mutable execution context shared across orchestrator strategies.
- * @param {Object} input Normalized orchestrator input.
- * @returns {Object} Orchestrator execution context.
- */
-function createPipelineContext(input) {
-    return {
-        input
-    };
-}
 
 /**
  * Return the ordered strategy pipeline for deterministic-first orchestration.
@@ -64,35 +34,42 @@ function createPipelineContext(input) {
  */
 function getStrategyPipeline() {
     return [
-        { name: "preCheckStrategy", execute: preCheckStrategy },
-        { name: "stateStrategy", execute: stateStrategy },
-        { name: "ruleBasedStrategy", execute: ruleBasedStrategy },
-        { name: "faqStrategy", execute: faqStrategy },
-        { name: "ragStrategy", execute: ragStrategy },
-        { name: "llmStrategy", execute: llmStrategy },
-        { name: "templatePolicyEvaluator", execute: templatePolicyEvaluator },
-        { name: "humanHandoffStrategy", execute: humanHandoffStrategy }
-    ];
+        preCheckStrategy,
+        stateStrategy,
+        ruleBasedStrategy,
+        faqStrategy,
+        ragStrategy,
+        llmStrategy,
+        templatePolicyEvaluator,
+        humanHandoffStrategy
+    ].map(assertValidStrategyModule);
 }
 
 /**
- * Run the configured strategies in order until one produces a handled decision.
- * @param {Object} context Orchestrator execution context.
+ * Run the configured strategies in order until one returns a handled result.
+ * @param {Object} context Normalized orchestrator context.
  * @returns {Promise<Object|null>} First handled decision or null.
  */
 async function runPipeline(context) {
     for (const strategy of getStrategyPipeline()) {
         logger.debug("Running orchestrator strategy", {
             strategy: strategy.name,
-            messageId: context.input.message.messageId
+            messageId: context.message.messageId
         });
 
-        const result = await strategy.execute(context);
+        const result = assertValidStrategyResult(await strategy.execute(context));
 
-        if (result && result.handled) {
+        logger.debug("Strategy completed", {
+            strategy: strategy.name,
+            messageId: context.message.messageId,
+            handled: result.handled,
+            reason: result.reason || null
+        });
+
+        if (result.handled) {
             logger.debug("Strategy handled request", {
                 strategy: strategy.name,
-                messageId: context.input.message.messageId,
+                messageId: context.message.messageId,
                 decision: result.decision
             });
             return result.decision;
@@ -108,8 +85,16 @@ async function runPipeline(context) {
  * @returns {Promise<Object>} Structured orchestrator decision.
  */
 async function orchestrate(input) {
-    const normalizedInput = normalizeInput(input);
-    const context = createPipelineContext(normalizedInput);
+    const context = normalizeOrchestratorContext(input);
+    const validation = validateOrchestratorContext(context);
+
+    if (!validation.valid) {
+        logger.error("Invalid orchestrator context", {
+            reason: validation.reason,
+            input
+        });
+        return createErrorDecision(validation.reason);
+    }
 
     try {
         const decision = await runPipeline(context);
@@ -120,14 +105,14 @@ async function orchestrate(input) {
 
         const fallbackDecision = createFallbackDecision();
         logger.debug("No strategy handled request, using fallback", {
-            messageId: normalizedInput.message.messageId,
+            messageId: context.message.messageId,
             decision: fallbackDecision
         });
 
         return fallbackDecision;
     } catch (error) {
         logger.error("Orchestration pipeline failed", {
-            messageId: normalizedInput.message.messageId,
+            messageId: context.message.messageId,
             error
         });
 

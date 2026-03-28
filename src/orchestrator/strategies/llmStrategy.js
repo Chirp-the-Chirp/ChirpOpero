@@ -1,15 +1,16 @@
 "use strict";
 
-const { notHandled } = require("../decisionFactory");
+const { createStrategy } = require("../contracts/strategyContract");
+const { createNotHandledResult } = require("../contracts/strategyResultContract");
 
 /**
- * Placeholder for LLM-backed response generation.
- * @param {Object} context Orchestrator execution context.
+ * Placeholder for model-generated responses after deterministic options are exhausted.
+ * @param {Object} context Normalized orchestrator context.
  * @returns {Promise<Object>} Strategy result.
  */
-async function llmStrategy(context) {
+async function execute(context) {
     void context;
-    return notHandled();
+    return createNotHandledResult("llm strategy not implemented");
 }
 
-module.exports = llmStrategy;
+module.exports = createStrategy("llmStrategy", execute);

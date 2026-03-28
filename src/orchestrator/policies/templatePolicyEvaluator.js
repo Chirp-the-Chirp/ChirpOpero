@@ -1,15 +1,16 @@
 "use strict";
 
-const { notHandled } = require("../decisionFactory");
+const { createStrategy } = require("../contracts/strategyContract");
+const { createNotHandledResult } = require("../contracts/strategyResultContract");
 
 /**
- * Placeholder for template policy checks before any template-based response is sent.
- * @param {Object} context Orchestrator execution context.
+ * Placeholder for validating whether a candidate response must use an approved template.
+ * @param {Object} context Normalized orchestrator context.
  * @returns {Promise<Object>} Strategy result.
  */
-async function templatePolicyEvaluator(context) {
+async function execute(context) {
     void context;
-    return notHandled();
+    return createNotHandledResult("template policy evaluator not implemented");
 }
 
-module.exports = templatePolicyEvaluator;
+module.exports = createStrategy("templatePolicyEvaluator", execute);

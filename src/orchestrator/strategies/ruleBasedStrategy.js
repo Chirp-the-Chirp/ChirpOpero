@@ -1,43 +1,50 @@
 "use strict";
 
-const { createReplyDecision, handled, notHandled } = require("../decisionFactory");
+const { createReplyDecision } = require("../decisionFactory");
+const { createStrategy } = require("../contracts/strategyContract");
+const {
+    createHandledResult,
+    createNotHandledResult
+} = require("../contracts/strategyResultContract");
 
 const GREETING_PHRASES = new Set(["hi", "hello"]);
 
 /**
- * Resolve deterministic rules such as greetings and direct help requests.
- * @param {Object} context Orchestrator execution context.
+ * Resolve deterministic greeting and help rules before more expensive strategies run.
+ * @param {Object} context Normalized orchestrator context.
  * @returns {Promise<Object>} Strategy result.
  */
-async function ruleBasedStrategy(context) {
-    const text = context?.input?.message?.text || "";
+async function execute(context) {
+    const text = context.message.text || "";
     const normalizedText = text.trim().toLowerCase();
 
     if (!normalizedText) {
-        return notHandled();
+        return createNotHandledResult("rule-based strategy skipped empty text");
     }
 
     if (GREETING_PHRASES.has(normalizedText)) {
-        return handled(
+        return createHandledResult(
             createReplyDecision(
                 "Hey there! How can I help you today?",
                 "matched greeting",
                 0.9
-            )
+            ),
+            "matched greeting phrase"
         );
     }
 
     if (normalizedText === "help") {
-        return handled(
+        return createHandledResult(
             createReplyDecision(
                 "Sure, I can help! Tell me what you need and I will try to guide you.",
                 "matched help request",
                 0.85
-            )
+            ),
+            "matched help phrase"
         );
     }
 
-    return notHandled();
+    return createNotHandledResult("no rule-based match found");
 }
 
-module.exports = ruleBasedStrategy;
+module.exports = createStrategy("ruleBasedStrategy", execute);

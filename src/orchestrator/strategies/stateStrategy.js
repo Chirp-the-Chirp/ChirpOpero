@@ -1,15 +1,16 @@
 "use strict";
 
-const { notHandled } = require("../decisionFactory");
+const { createStrategy } = require("../contracts/strategyContract");
+const { createNotHandledResult } = require("../contracts/strategyResultContract");
 
 /**
- * Inspect active conversation state before content-based strategies run.
- * @param {Object} context Orchestrator execution context.
+ * Placeholder for active-state routing such as awaiting replies or forms.
+ * @param {Object} context Normalized orchestrator context.
  * @returns {Promise<Object>} Strategy result.
  */
-async function stateStrategy(context) {
+async function execute(context) {
     void context;
-    return notHandled();
+    return createNotHandledResult("no active conversation-state handler configured");
 }
 
-module.exports = stateStrategy;
+module.exports = createStrategy("stateStrategy", execute);

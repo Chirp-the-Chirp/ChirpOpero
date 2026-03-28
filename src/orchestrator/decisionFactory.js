@@ -1,6 +1,12 @@
 "use strict";
 
 const { ACTIONS, SOURCES } = require("./decisionTypes");
+const { assertValidDecision } = require("./contracts/decisionContract");
+
+/**
+ * Decision factory helpers centralize valid decision creation so strategies
+ * can stay focused on routing logic instead of object-shape bookkeeping.
+ */
 
 /**
  * Build the standard reply decision shape used by orchestrator strategies.
@@ -18,7 +24,7 @@ function createReplyDecision(
     nextState = null,
     source = SOURCES.RULE_ENGINE
 ) {
-    return {
+    return assertValidDecision({
         action: ACTIONS.REPLY,
         source,
         response: {
@@ -29,7 +35,7 @@ function createReplyDecision(
         handoffRequired: false,
         reason,
         confidence
-    };
+    });
 }
 
 /**
@@ -39,7 +45,7 @@ function createReplyDecision(
  * @returns {Object} Error decision payload.
  */
 function createErrorDecision(reason, confidence = 1) {
-    return {
+    return assertValidDecision({
         action: ACTIONS.ERROR,
         source: SOURCES.RULE_ENGINE,
         response: null,
@@ -47,7 +53,7 @@ function createErrorDecision(reason, confidence = 1) {
         handoffRequired: false,
         reason,
         confidence
-    };
+    });
 }
 
 /**
@@ -62,32 +68,8 @@ function createFallbackDecision() {
     );
 }
 
-/**
- * Wrap a handled decision in the pipeline result contract.
- * @param {Object} decision Structured orchestrator decision.
- * @returns {Object} Strategy pipeline result.
- */
-function handled(decision) {
-    return {
-        handled: true,
-        decision
-    };
-}
-
-/**
- * Return the standard not-handled result for strategy pipeline steps.
- * @returns {Object} Strategy pipeline result.
- */
-function notHandled() {
-    return {
-        handled: false
-    };
-}
-
 module.exports = {
     createReplyDecision,
     createErrorDecision,
-    createFallbackDecision,
-    handled,
-    notHandled
+    createFallbackDecision
 };
