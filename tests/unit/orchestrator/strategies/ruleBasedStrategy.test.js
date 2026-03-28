@@ -8,13 +8,14 @@ describe("ruleBasedStrategy", () => {
     test.each(["hi", "hello", " Hello "])(
         "handles greeting phrase '%s'",
         async (text) => {
-            const result = await ruleBasedStrategy({
-                input: {
-                    message: {
-                        text
-                    }
-                }
-            });
+        const result = await ruleBasedStrategy.execute({
+            message: {
+                text
+            },
+            conversation: {},
+            customer: {},
+            metadata: {}
+        });
 
             expect(result.handled).toBe(true);
             expect(result.decision.action).toBe("reply");
@@ -25,12 +26,13 @@ describe("ruleBasedStrategy", () => {
     );
 
     test("handles direct help requests", async () => {
-        const result = await ruleBasedStrategy({
-            input: {
-                message: {
-                    text: "help"
-                }
-            }
+        const result = await ruleBasedStrategy.execute({
+            message: {
+                text: "help"
+            },
+            conversation: {},
+            customer: {},
+            metadata: {}
         });
 
         expect(result.handled).toBe(true);
@@ -39,14 +41,18 @@ describe("ruleBasedStrategy", () => {
     });
 
     test("returns not handled for unknown text", async () => {
-        const result = await ruleBasedStrategy({
-            input: {
-                message: {
-                    text: "pricing details"
-                }
-            }
+        const result = await ruleBasedStrategy.execute({
+            message: {
+                text: "pricing details"
+            },
+            conversation: {},
+            customer: {},
+            metadata: {}
         });
 
-        expect(result).toEqual({ handled: false });
+        expect(result).toEqual({
+            handled: false,
+            reason: "no rule-based match found"
+        });
     });
 });
