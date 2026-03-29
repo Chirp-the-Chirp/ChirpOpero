@@ -16,6 +16,9 @@ jest.mock("../../../src/utils/logger", () => ({
 
 const RedisService = require("../../../src/services/redis.service");
 const ConversationStateService = require("../../../src/services/conversation-state.service");
+const {
+    CONVERSATION_STATES
+} = require("../../../src/orchestrator/conversationStateTypes");
 
 describe("ConversationStateService", () => {
     // These tests cover the state persistence contract shared with the orchestrator.
@@ -41,7 +44,7 @@ describe("ConversationStateService", () => {
 
     test("normalizes stored state from Redis", async () => {
         RedisService.getJson.mockResolvedValue({
-            state: "collecting_details",
+            state: CONVERSATION_STATES.WAITING_FOR_ORDER_ID,
             lastRoute: "rule_engine"
         });
 
@@ -53,7 +56,7 @@ describe("ConversationStateService", () => {
             "conversation_state:94770000001"
         );
         expect(state).toMatchObject({
-            state: "collecting_details",
+            state: CONVERSATION_STATES.WAITING_FOR_ORDER_ID,
             lastRoute: "rule_engine",
             lastHandledAt: null
         });

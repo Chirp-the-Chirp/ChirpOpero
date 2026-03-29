@@ -156,6 +156,102 @@ describe("ConversationOrchestrator pipeline", () => {
         expect(decision.response.text).toBe("Handled by rule strategy");
     });
 
+    test("lets stateStrategy short-circuit the pipeline before ruleBasedStrategy", async () => {
+        const preCheckStrategy = {
+            name: "preCheckStrategy",
+            execute: jest.fn().mockResolvedValue({
+                handled: false,
+                reason: "pre-checks passed"
+            })
+        };
+        const stateStrategy = {
+            name: "stateStrategy",
+            execute: jest.fn().mockResolvedValue({
+                handled: true,
+                decision: {
+                    action: "reply",
+                    source: "rule_engine",
+                    response: {
+                        type: "text",
+                        text: "Checking your order..."
+                    },
+                    nextState: null,
+                    handoffRequired: false,
+                    reason: "handled WAITING_FOR_ORDER_ID state",
+                    confidence: 0.95
+                },
+                reason: "continued WAITING_FOR_ORDER_ID flow"
+            })
+        };
+        const ruleBasedStrategy = {
+            name: "ruleBasedStrategy",
+            execute: jest.fn().mockResolvedValue({
+                handled: true,
+                decision: {
+                    action: "reply",
+                    source: "rule_engine",
+                    response: {
+                        type: "text",
+                        text: "Should not run"
+                    },
+                    nextState: null,
+                    handoffRequired: false,
+                    reason: "matched greeting",
+                    confidence: 0.9
+                },
+                reason: "matched greeting phrase"
+            })
+        };
+
+        const { orchestrate } = await loadOrchestrator({
+            preCheckStrategy,
+            stateStrategy,
+            ruleBasedStrategy,
+            faqStrategy: {
+                name: "faqStrategy",
+                execute: jest.fn().mockResolvedValue({
+                    handled: false,
+                    reason: "faq strategy not implemented"
+                })
+            },
+            ragStrategy: {
+                name: "ragStrategy",
+                execute: jest.fn().mockResolvedValue({
+                    handled: false,
+                    reason: "rag strategy not implemented"
+                })
+            },
+            llmStrategy: {
+                name: "llmStrategy",
+                execute: jest.fn().mockResolvedValue({
+                    handled: false,
+                    reason: "llm strategy not implemented"
+                })
+            },
+            templatePolicyEvaluator: {
+                name: "templatePolicyEvaluator",
+                execute: jest.fn().mockResolvedValue({
+                    handled: false,
+                    reason: "template policy evaluator not implemented"
+                })
+            },
+            humanHandoffStrategy: {
+                name: "humanHandoffStrategy",
+                execute: jest.fn().mockResolvedValue({
+                    handled: false,
+                    reason: "human handoff strategy not implemented"
+                })
+            }
+        });
+
+        const decision = await orchestrate(createInput());
+
+        expect(preCheckStrategy.execute).toHaveBeenCalledTimes(1);
+        expect(stateStrategy.execute).toHaveBeenCalledTimes(1);
+        expect(ruleBasedStrategy.execute).not.toHaveBeenCalled();
+        expect(decision.response.text).toBe("Checking your order...");
+    });
+
     test("returns fallback when no strategy handles the message", async () => {
         const createNotHandledStrategy = (name) => ({
             name,

@@ -1,54 +1,79 @@
 "use strict";
 
+jest.mock("../../../../src/utils/logger", () => ({
+    createLogger: jest.fn(() => ({
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn()
+    }))
+}));
+
 const ruleBasedStrategy = require("../../../../src/orchestrator/strategies/ruleBasedStrategy");
+const flowRegistry = require("../../../../src/orchestrator/flows/flowRegistry");
+const ruleRegistry = require("../../../../src/orchestrator/rules/ruleRegistry");
 
 describe("ruleBasedStrategy", () => {
-    // These tests lock down the current deterministic message routing rules.
+    // These tests lock down deterministic flow-starts and static one-shot rules.
 
-    test.each(["hi", "hello", " Hello "])(
-        "handles greeting phrase '%s'",
-        async (text) => {
-        const result = await ruleBasedStrategy.execute({
+    function createContext(text) {
+        return {
             message: {
                 text
             },
             conversation: {},
             customer: {},
             metadata: {}
-        });
+        };
+    }
 
-            expect(result.handled).toBe(true);
-            expect(result.decision.action).toBe("reply");
-            expect(result.decision.response.text).toBe(
-                "Hey there! How can I help you today?"
-            );
-        }
-    );
-
-    test("handles direct help requests", async () => {
-        const result = await ruleBasedStrategy.execute({
-            message: {
-                text: "help"
-            },
-            conversation: {},
-            customer: {},
-            metadata: {}
-        });
+    test("starts orderFlow from flowRegistry when the message is 'order'", async () => {
+        const result = await ruleBasedStrategy.execute(createContext("order"));
 
         expect(result.handled).toBe(true);
-        expect(result.decision.reason).toBe("matched help request");
-        expect(result.decision.response.text).toContain("Sure, I can help");
+        expect(result.reason).toBe("matched flow trigger for orderFlow");
+        expect(result.decision.response.text).toBe(
+            flowRegistry.orderFlow.entry.response.text
+        );
+        expect(result.decision.nextState).toBe(
+            flowRegistry.orderFlow.entry.state
+        );
+        expect(result.decision.reason).toBe("started orderFlow");
     });
 
-    test("returns not handled for unknown text", async () => {
-        const result = await ruleBasedStrategy.execute({
-            message: {
-                text: "pricing details"
-            },
-            conversation: {},
-            customer: {},
-            metadata: {}
-        });
+    test("matches 'hi' from ruleRegistry", async () => {
+        const result = await ruleBasedStrategy.execute(createContext("hi"));
+
+        expect(result.handled).toBe(true);
+        expect(result.reason).toBe("matched static rule greetingHi");
+        expect(result.decision.response).toEqual(ruleRegistry.greetingHi.response);
+        expect(result.decision.nextState).toBeNull();
+    });
+
+    test("matches 'hello' from ruleRegistry", async () => {
+        const result = await ruleBasedStrategy.execute(createContext("hello"));
+
+        expect(result.handled).toBe(true);
+        expect(result.reason).toBe("matched static rule greetingHello");
+        expect(result.decision.response).toEqual(
+            ruleRegistry.greetingHello.response
+        );
+        expect(result.decision.nextState).toBeNull();
+    });
+
+    test("matches 'help' from ruleRegistry", async () => {
+        const result = await ruleBasedStrategy.execute(createContext("help"));
+
+        expect(result.handled).toBe(true);
+        expect(result.reason).toBe("matched static rule helpRule");
+        expect(result.decision.response).toEqual(ruleRegistry.helpRule.response);
+        expect(result.decision.nextState).toBeNull();
+    });
+
+    test("returns handled false for unknown input", async () => {
+        const result = await ruleBasedStrategy.execute(
+            createContext("pricing details")
+        );
 
         expect(result).toEqual({
             handled: false,
