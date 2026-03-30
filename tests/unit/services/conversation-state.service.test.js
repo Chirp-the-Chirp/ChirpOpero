@@ -147,6 +147,27 @@ describe("ConversationStateService", () => {
         );
     });
 
+    test("clears the active state when nextState is explicitly null", async () => {
+        RedisService.getJson.mockResolvedValue({
+            state: CONVERSATION_STATES.WAITING_FOR_ORDER_ID,
+            lastRoute: "rule_engine"
+        });
+
+        await ConversationStateService.recordInteractionResult("94770000001", {
+            nextState: null,
+            source: "rule_engine"
+        });
+
+        expect(RedisService.setJson).toHaveBeenCalledWith(
+            "conversation_state:94770000001",
+            expect.objectContaining({
+                state: null,
+                lastRoute: "rule_engine",
+                lastHandledAt: expect.any(String)
+            })
+        );
+    });
+
     test("records status updates without orchestrator-specific fields", async () => {
         RedisService.getJson.mockResolvedValue(null);
 

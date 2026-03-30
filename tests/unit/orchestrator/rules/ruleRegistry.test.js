@@ -9,6 +9,7 @@ describe("ruleRegistry", () => {
         expect(Object.keys(ruleRegistry)).toEqual([
             "greetingHi",
             "greetingHello",
+            "greetingHey",
             "helpRule"
         ]);
     });
