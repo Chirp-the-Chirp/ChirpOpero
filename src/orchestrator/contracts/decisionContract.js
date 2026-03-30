@@ -55,6 +55,20 @@ function validateDecision(decision) {
         return { valid: false, reason: "decision handoffRequired must be boolean" };
     }
 
+    if (!Object.prototype.hasOwnProperty.call(decision, "nextState")) {
+        return { valid: false, reason: "decision nextState must be explicit" };
+    }
+
+    if (
+        decision.nextState !== null &&
+        (typeof decision.nextState !== "string" || decision.nextState.trim() === "")
+    ) {
+        return {
+            valid: false,
+            reason: "decision nextState must be a non-empty string or null"
+        };
+    }
+
     if (decision.action === ACTIONS.REPLY) {
         if (!decision.response || typeof decision.response !== "object") {
             return { valid: false, reason: "reply decision requires response" };

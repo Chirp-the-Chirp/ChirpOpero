@@ -28,7 +28,7 @@ const ruleRegistry = Object.freeze({
             text: "Hey there! How can I help you today?"
         }
     },
-    greetingHello: {
+    greetingHey: {
         id: "greetingHey",
         trigger: {
             type: "keyword",
