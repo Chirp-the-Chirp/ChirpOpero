@@ -20,7 +20,10 @@
   "main": "app.js",
   "scripts": {
     "start": "node src/server.js",
-    "test": "echo no tests yet!"
+    "test": "jest --runInBand"
+  },
+  "devDependencies": {
+    "jest": "^30.0.5"
   },
   "dependencies": {
     "body-parser": "^1.20.2",
