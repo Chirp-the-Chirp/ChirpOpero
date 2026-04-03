@@ -166,8 +166,9 @@ class ConversationStateService {
         const currentState = await this.getConversationState(customerId);
 
         return this.updateConversationState(customerId, {
+            // Explicit nextState values, including null, control flow lifecycle.
             state:
-                decision?.nextState !== undefined && decision?.nextState !== null
+                Object.prototype.hasOwnProperty.call(decision || {}, "nextState")
                     ? decision.nextState
                     : currentState.state,
             lastRoute: decision?.source || currentState.lastRoute,
