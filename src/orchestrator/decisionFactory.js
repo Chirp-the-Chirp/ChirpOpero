@@ -57,6 +57,24 @@ function createErrorDecision(reason, confidence = 1) {
 }
 
 /**
+ * Build a no-reply decision for clean routing termination.
+ * @param {string} reason Human-readable explanation for ending silently.
+ * @param {number} [confidence=1] Confidence score for the decision.
+ * @returns {Object} No-reply decision payload.
+ */
+function createNoReplyDecision(reason, confidence = 1) {
+    return assertValidDecision({
+        action: ACTIONS.NO_REPLY,
+        source: SOURCES.RULE_ENGINE,
+        response: null,
+        nextState: null,
+        handoffRequired: false,
+        reason,
+        confidence
+    });
+}
+
+/**
  * Build the deterministic fallback reply used when no strategy handles the message.
  * @returns {Object} Reply decision payload.
  */
@@ -71,5 +89,6 @@ function createFallbackDecision() {
 module.exports = {
     createReplyDecision,
     createErrorDecision,
+    createNoReplyDecision,
     createFallbackDecision
 };

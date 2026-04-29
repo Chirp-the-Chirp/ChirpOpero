@@ -12,8 +12,19 @@ const { assertValidDecision } = require("./decisionContract");
  * @typedef {Object} StrategyResult
  * @property {boolean} handled
  * @property {Object} [decision]
+ * @property {"RESPOND"|"CONTINUE"|"FALLBACK"|"END"} [outcome]
+ * @property {Object|string|null} [response]
+ * @property {string|null} [nextState]
+ * @property {Object} [metadata]
  * @property {string} [reason]
  */
+
+const STRATEGY_RESULT_OUTCOMES = Object.freeze({
+    RESPOND: "RESPOND",
+    CONTINUE: "CONTINUE",
+    FALLBACK: "FALLBACK",
+    END: "END"
+});
 
 /**
  * Create a handled strategy result.
@@ -22,10 +33,16 @@ const { assertValidDecision } = require("./decisionContract");
  * @returns {StrategyResult} Handled result.
  */
 function createHandledResult(decision, reason) {
+    const validDecision = assertValidDecision(decision);
+
     return {
         handled: true,
-        decision: assertValidDecision(decision),
-        reason: reason || decision.reason
+        decision: validDecision,
+        outcome: STRATEGY_RESULT_OUTCOMES.RESPOND,
+        response: validDecision.response,
+        nextState: validDecision.nextState,
+        metadata: {},
+        reason: reason || validDecision.reason
     };
 }
 
@@ -37,7 +54,45 @@ function createHandledResult(decision, reason) {
 function createNotHandledResult(reason) {
     return {
         handled: false,
+        outcome: STRATEGY_RESULT_OUTCOMES.CONTINUE,
+        response: null,
+        nextState: null,
+        metadata: {},
         reason: reason || "strategy did not handle the request"
+    };
+}
+
+/**
+ * Create an explicit fallback strategy result.
+ * @param {string} reason Fallback explanation.
+ * @param {Object} [metadata={}] Optional fallback metadata.
+ * @returns {StrategyResult} Fallback result.
+ */
+function createFallbackResult(reason, metadata = {}) {
+    return {
+        handled: false,
+        outcome: STRATEGY_RESULT_OUTCOMES.FALLBACK,
+        response: null,
+        nextState: null,
+        metadata,
+        reason: reason || "strategy requested fallback"
+    };
+}
+
+/**
+ * Create an explicit end strategy result.
+ * @param {string} reason End explanation.
+ * @param {Object} [metadata={}] Optional end metadata.
+ * @returns {StrategyResult} End result.
+ */
+function createEndResult(reason, metadata = {}) {
+    return {
+        handled: false,
+        outcome: STRATEGY_RESULT_OUTCOMES.END,
+        response: null,
+        nextState: null,
+        metadata,
+        reason: reason || "strategy ended routing"
     };
 }
 
@@ -52,10 +107,29 @@ function validateStrategyResult(result) {
     }
 
     if (typeof result.handled !== "boolean") {
-        return { valid: false, reason: "strategy result requires handled boolean" };
+        if (!Object.values(STRATEGY_RESULT_OUTCOMES).includes(result.outcome)) {
+            return {
+                valid: false,
+                reason: "strategy result requires handled boolean or valid outcome"
+            };
+        }
     }
 
-    if (result.handled) {
+    if (
+        result.outcome !== undefined &&
+        !Object.values(STRATEGY_RESULT_OUTCOMES).includes(result.outcome)
+    ) {
+        return { valid: false, reason: "strategy result outcome is invalid" };
+    }
+
+    if (
+        result.metadata !== undefined &&
+        (!result.metadata || typeof result.metadata !== "object")
+    ) {
+        return { valid: false, reason: "strategy result metadata must be an object" };
+    }
+
+    if (result.handled || result.outcome === STRATEGY_RESULT_OUTCOMES.RESPOND) {
         if (!result.decision) {
             return {
                 valid: false,
@@ -89,8 +163,11 @@ function assertValidStrategyResult(result) {
 }
 
 module.exports = {
+    STRATEGY_RESULT_OUTCOMES,
     createHandledResult,
     createNotHandledResult,
+    createFallbackResult,
+    createEndResult,
     validateStrategyResult,
     assertValidStrategyResult
 };
