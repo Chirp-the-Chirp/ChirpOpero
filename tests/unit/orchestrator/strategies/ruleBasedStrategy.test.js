@@ -75,8 +75,9 @@ describe("ruleBasedStrategy", () => {
             createContext("pricing details")
         );
 
-        expect(result).toEqual({
+        expect(result).toMatchObject({
             handled: false,
+            outcome: "CONTINUE",
             reason: "no rule-based match found"
         });
     });

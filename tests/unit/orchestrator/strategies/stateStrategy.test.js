@@ -64,8 +64,9 @@ describe("stateStrategy", () => {
 
         const result = await stateStrategy.execute(createContext());
 
-        expect(result).toEqual({
+        expect(result).toMatchObject({
             handled: false,
+            outcome: "CONTINUE",
             reason: "no active conversation state"
         });
     });
@@ -78,8 +79,9 @@ describe("stateStrategy", () => {
 
         const result = await stateStrategy.execute(createContext());
 
-        expect(result).toEqual({
+        expect(result).toMatchObject({
             handled: false,
+            outcome: "CONTINUE",
             reason: "unsupported active state: UNKNOWN_ACTIVE_STATE"
         });
         expect(findFlowByState).toHaveBeenCalledWith("UNKNOWN_ACTIVE_STATE");
@@ -125,8 +127,9 @@ describe("stateStrategy", () => {
                 })
             })
         );
-        expect(result).toEqual({
+        expect(result).toMatchObject({
             handled: true,
+            outcome: "RESPOND",
             decision: {
                 action: "reply",
                 source: "rule_engine",
@@ -263,8 +266,9 @@ describe("stateStrategy", () => {
 
         const result = await stateStrategy.execute(createContext("ORD-10001"));
 
-        expect(result).toEqual({
+        expect(result).toMatchObject({
             handled: false,
+            outcome: "CONTINUE",
             reason: "missing state handler for active state: WAITING_FOR_ORDER_ID"
         });
     });
@@ -286,8 +290,9 @@ describe("stateStrategy", () => {
 
         const result = await stateStrategy.execute(createContext("ORD-10001"));
 
-        expect(result).toEqual({
+        expect(result).toMatchObject({
             handled: true,
+            outcome: "RESPOND",
             decision: {
                 action: "reply",
                 source: "rule_engine",

@@ -48,8 +48,9 @@ describe("preCheckStrategy", () => {
             metadata: {}
         });
 
-        expect(result).toEqual({
+        expect(result).toMatchObject({
             handled: false,
+            outcome: "CONTINUE",
             reason: "pre-checks passed"
         });
     });
