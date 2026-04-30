@@ -23,7 +23,9 @@ describe("routeDecisionContract", () => {
             action: ROUTE_ACTIONS.RUN_STRATEGY,
             nextStrategy: STRATEGY_IDS.RULE_BASED,
             reason: "route to deterministic rules",
-            metadata: {}
+            metadata: {
+                selectedStrategy: STRATEGY_IDS.RULE_BASED
+            }
         });
     });
 
@@ -34,15 +36,28 @@ describe("routeDecisionContract", () => {
             action: ROUTE_ACTIONS.FALLBACK,
             nextStrategy: null,
             reason: "nothing handled the message",
-            metadata: {}
+            metadata: {
+                fallbackReason: "nothing handled the message"
+            }
         });
     });
 
-    test("rejects unknown strategy ids", () => {
+    test("allows arbitrary registered strategy keys", () => {
+        expect(
+            validateRouteDecision(
+                createStrategyRoute(
+                    "customStrategy",
+                    "route to custom strategy"
+                )
+            )
+        ).toEqual({ valid: true });
+    });
+
+    test("rejects empty strategy ids", () => {
         expect(
             validateRouteDecision({
                 action: ROUTE_ACTIONS.RUN_STRATEGY,
-                nextStrategy: "missingStrategy",
+                nextStrategy: "",
                 reason: "bad route",
                 metadata: {}
             })

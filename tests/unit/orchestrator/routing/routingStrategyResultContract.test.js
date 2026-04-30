@@ -31,6 +31,9 @@ describe("routingStrategyResultContract", () => {
             handled: true,
             decision: replyDecision,
             reason: "rule handled"
+        }, {
+            previousStrategy: STRATEGY_IDS.STATE,
+            hopCount: 2
         });
 
         expect(result).toEqual({
@@ -38,7 +41,13 @@ describe("routingStrategyResultContract", () => {
             outcome: STRATEGY_OUTCOMES.RESPOND,
             decision: replyDecision,
             reason: "rule handled",
-            metadata: {}
+            metadata: {
+                selectedStrategy: STRATEGY_IDS.RULE_BASED,
+                previousStrategy: STRATEGY_IDS.STATE,
+                hopCount: 2,
+                responseSource: "rule_engine",
+                fallbackReason: null
+            }
         });
     });
 
@@ -46,6 +55,9 @@ describe("routingStrategyResultContract", () => {
         const result = adaptStrategyResult(STRATEGY_IDS.STATE, {
             handled: false,
             reason: "no active state"
+        }, {
+            previousStrategy: STRATEGY_IDS.PRE_CHECK,
+            hopCount: 1
         });
 
         expect(result).toEqual({
@@ -53,7 +65,13 @@ describe("routingStrategyResultContract", () => {
             outcome: STRATEGY_OUTCOMES.CONTINUE,
             decision: null,
             reason: "no active state",
-            metadata: {}
+            metadata: {
+                selectedStrategy: STRATEGY_IDS.STATE,
+                previousStrategy: STRATEGY_IDS.PRE_CHECK,
+                hopCount: 1,
+                responseSource: null,
+                fallbackReason: null
+            }
         });
     });
 
@@ -86,7 +104,13 @@ describe("routingStrategyResultContract", () => {
             outcome: STRATEGY_OUTCOMES.FALLBACK,
             decision: null,
             reason: "llm unavailable",
-            metadata: {}
+            metadata: {
+                selectedStrategy: STRATEGY_IDS.LLM,
+                previousStrategy: null,
+                hopCount: null,
+                responseSource: null,
+                fallbackReason: "llm unavailable"
+            }
         });
     });
 });

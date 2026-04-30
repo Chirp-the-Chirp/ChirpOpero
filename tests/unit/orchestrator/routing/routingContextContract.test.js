@@ -34,6 +34,17 @@ describe("routingContextContract", () => {
     test("builds routing context from normalized orchestrator context", () => {
         const context = createRoutingContext(createOrchestratorContext(), {
             visitedStrategies: ["stateStrategy"],
+            routeHistory: [
+                {
+                    hopCount: 0,
+                    selectedStrategy: "stateStrategy",
+                    outcome: "CONTINUE"
+                }
+            ],
+            selectedStrategy: "stateStrategy",
+            previousStrategy: "preCheckStrategy",
+            fallbackReason: "state skipped",
+            responseSource: "rule_engine",
             hopCount: 1
         });
 
@@ -52,6 +63,15 @@ describe("routingContextContract", () => {
             }),
             previousResult: null,
             visitedStrategies: ["stateStrategy"],
+            routeHistory: [
+                expect.objectContaining({
+                    selectedStrategy: "stateStrategy"
+                })
+            ],
+            selectedStrategy: "stateStrategy",
+            previousStrategy: "preCheckStrategy",
+            fallbackReason: "state skipped",
+            responseSource: "rule_engine",
             hopCount: 1
         });
         expect(validateRoutingContext(context)).toEqual({ valid: true });
@@ -65,6 +85,11 @@ describe("routingContextContract", () => {
                 customer: {},
                 metadata: {},
                 visitedStrategies: "stateStrategy",
+                routeHistory: [],
+                selectedStrategy: null,
+                previousStrategy: null,
+                fallbackReason: null,
+                responseSource: null,
                 hopCount: 0,
                 previousResult: null
             })

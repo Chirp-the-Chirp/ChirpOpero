@@ -70,6 +70,21 @@ describe("ConversationOrchestrator routing", () => {
         return require("../../../src/orchestrator/conversationOrchestrator");
     }
 
+    async function loadOrchestratorFactory() {
+        jest.resetModules();
+
+        jest.doMock("../../../src/utils/logger", () => ({
+            createLogger: jest.fn(() => ({
+                debug: jest.fn(),
+                info: jest.fn(),
+                warn: jest.fn(),
+                error: jest.fn()
+            }))
+        }));
+
+        return require("../../../src/orchestrator/conversationOrchestrator");
+    }
+
     test("routes directly to ruleBasedStrategy when no active state exists", async () => {
         const preCheckStrategy = {
             name: "preCheckStrategy",
@@ -638,6 +653,78 @@ describe("ConversationOrchestrator routing", () => {
         );
         expect(decision.response.text).toBe("Template-safe answer");
         expect(decision.source).toBe("template_engine");
+    });
+
+    test("supports adding a new strategy without changing the orchestrator", async () => {
+        const {
+            createConversationOrchestrator
+        } = await loadOrchestratorFactory();
+        const {
+            createStrategyRegistry
+        } = require("../../../src/orchestrator/routing/strategyRegistry");
+        const {
+            ROUTE_ACTIONS
+        } = require("../../../src/orchestrator/routing/routeDecisionContract");
+        const customStrategy = {
+            name: "customStrategy",
+            execute: jest.fn().mockResolvedValue({
+                handled: true,
+                decision: {
+                    action: "reply",
+                    source: "llm",
+                    response: {
+                        type: "text",
+                        text: "Custom strategy reply"
+                    },
+                    nextState: null,
+                    handoffRequired: false,
+                    reason: "custom handled",
+                    confidence: 0.88
+                },
+                reason: "custom handled"
+            })
+        };
+        const registry = createStrategyRegistry({
+            preCheckStrategy: {
+                name: "preCheckStrategy",
+                execute: jest.fn().mockResolvedValue({
+                    handled: false,
+                    reason: "pre-checks passed"
+                })
+            },
+            templatePolicyEvaluator: {
+                name: "templatePolicyEvaluator",
+                execute: jest.fn().mockResolvedValue({
+                    handled: false,
+                    reason: "template skipped"
+                })
+            },
+            customStrategy
+        });
+        const customRoutingEngine = {
+            getNextRoute: jest.fn().mockReturnValue({
+                action: ROUTE_ACTIONS.RUN_STRATEGY,
+                nextStrategy: "customStrategy",
+                reason: "custom strategy selected",
+                metadata: {
+                    selectedStrategy: "customStrategy",
+                    previousStrategy: null,
+                    fallbackReason: null,
+                    hopCount: 0,
+                    ruleName: "custom_strategy_selected"
+                }
+            })
+        };
+        const { orchestrate } = createConversationOrchestrator({
+            strategyRegistry: registry,
+            routingEngine: customRoutingEngine
+        });
+
+        const decision = await orchestrate(createInput());
+
+        expect(customRoutingEngine.getNextRoute).toHaveBeenCalledTimes(1);
+        expect(customStrategy.execute).toHaveBeenCalledTimes(1);
+        expect(decision.response.text).toBe("Custom strategy reply");
     });
 
     test("returns an error decision when a strategy throws unexpectedly", async () => {

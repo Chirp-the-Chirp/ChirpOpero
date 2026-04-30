@@ -11,6 +11,9 @@ jest.mock("../../../../src/utils/logger", () => ({
 
 const routingEngine = require("../../../../src/orchestrator/routing/routingEngine");
 const {
+    RoutingEngine
+} = require("../../../../src/orchestrator/routing/routingEngine");
+const {
     ROUTE_ACTIONS
 } = require("../../../../src/orchestrator/routing/routeDecisionContract");
 const {
@@ -24,6 +27,8 @@ describe("RoutingEngine", () => {
     // These tests lock down Phase 2 routing: state first when active, then fallback chain.
 
     function createContext(overrides = {}) {
+        const previousResult = overrides.previousResult || null;
+
         return {
             message: {
                 messageId: "wamid.text.001",
@@ -38,8 +43,16 @@ describe("RoutingEngine", () => {
             metadata: {
                 channel: "whatsapp"
             },
-            previousResult: null,
+            previousResult,
             visitedStrategies: [],
+            routeHistory: [],
+            selectedStrategy: null,
+            previousStrategy: previousResult?.strategyId || null,
+            fallbackReason:
+                previousResult?.outcome === STRATEGY_OUTCOMES.FALLBACK
+                    ? previousResult.reason
+                    : null,
+            responseSource: previousResult?.metadata?.responseSource || null,
             hopCount: 0,
             ...overrides
         };
@@ -57,7 +70,12 @@ describe("RoutingEngine", () => {
         expect(route).toMatchObject({
             action: ROUTE_ACTIONS.RUN_STRATEGY,
             nextStrategy: STRATEGY_IDS.STATE,
-            reason: "active conversation state found"
+            reason: "active conversation state found",
+            metadata: {
+                ruleName: "active_state_first",
+                selectedStrategy: STRATEGY_IDS.STATE,
+                hopCount: 0
+            }
         });
     });
 
@@ -234,7 +252,11 @@ describe("RoutingEngine", () => {
         expect(route).toMatchObject({
             action: ROUTE_ACTIONS.RUN_STRATEGY,
             nextStrategy: STRATEGY_IDS.HUMAN_HANDOFF,
-            reason: "strategy failure requires safe handoff fallback"
+            reason: "strategy failure requires safe handoff fallback",
+            metadata: {
+                fallbackReason: "ragStrategy failed",
+                previousStrategy: STRATEGY_IDS.RAG
+            }
         });
     });
 
@@ -249,6 +271,35 @@ describe("RoutingEngine", () => {
             action: ROUTE_ACTIONS.FALLBACK,
             nextStrategy: null,
             reason: "routing hop limit reached"
+        });
+    });
+
+    test("uses injected routing rules so new strategies can be selected without changing the orchestrator", () => {
+        const customEngine = new RoutingEngine({
+            routingRules: {
+                initial: [
+                    {
+                        name: "custom_first",
+                        matches: () => true,
+                        decide: () => ({
+                            action: ROUTE_ACTIONS.RUN_STRATEGY,
+                            nextStrategy: "customStrategy",
+                            reason: "custom strategy selected",
+                            metadata: {
+                                ruleName: "custom_first",
+                                selectedStrategy: "customStrategy"
+                            }
+                        })
+                    }
+                ],
+                followUp: []
+            }
+        });
+
+        expect(customEngine.getNextRoute(createContext())).toMatchObject({
+            action: ROUTE_ACTIONS.RUN_STRATEGY,
+            nextStrategy: "customStrategy",
+            reason: "custom strategy selected"
         });
     });
 });
