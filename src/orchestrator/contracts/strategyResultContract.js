@@ -41,7 +41,9 @@ function createHandledResult(decision, reason) {
         outcome: STRATEGY_RESULT_OUTCOMES.RESPOND,
         response: validDecision.response,
         nextState: validDecision.nextState,
-        metadata: {},
+        metadata: {
+            responseSource: validDecision.source
+        },
         reason: reason || validDecision.reason
     };
 }
@@ -57,7 +59,9 @@ function createNotHandledResult(reason) {
         outcome: STRATEGY_RESULT_OUTCOMES.CONTINUE,
         response: null,
         nextState: null,
-        metadata: {},
+        metadata: {
+            responseSource: null
+        },
         reason: reason || "strategy did not handle the request"
     };
 }

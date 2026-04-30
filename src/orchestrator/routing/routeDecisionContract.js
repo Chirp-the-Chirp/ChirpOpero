@@ -1,7 +1,5 @@
 "use strict";
 
-const { isKnownStrategyId } = require("./strategyIdentifiers");
-
 /**
  * Route decisions are produced by the routing engine and consumed by the
  * orchestrator. The routing engine only decides what should run next; it never
@@ -34,7 +32,10 @@ function createStrategyRoute(nextStrategy, reason, metadata = {}) {
         action: ROUTE_ACTIONS.RUN_STRATEGY,
         nextStrategy,
         reason,
-        metadata
+        metadata: {
+            ...metadata,
+            selectedStrategy: nextStrategy
+        }
     });
 }
 
@@ -49,7 +50,10 @@ function createFallbackRoute(reason, metadata = {}) {
         action: ROUTE_ACTIONS.FALLBACK,
         nextStrategy: null,
         reason,
-        metadata
+        metadata: {
+            ...metadata,
+            fallbackReason: metadata.fallbackReason || reason
+        }
     });
 }
 
@@ -91,7 +95,10 @@ function validateRouteDecision(route) {
     }
 
     if (route.action === ROUTE_ACTIONS.RUN_STRATEGY) {
-        if (!isKnownStrategyId(route.nextStrategy)) {
+        if (
+            typeof route.nextStrategy !== "string" ||
+            route.nextStrategy.trim() === ""
+        ) {
             return { valid: false, reason: "route decision strategy is invalid" };
         }
     }

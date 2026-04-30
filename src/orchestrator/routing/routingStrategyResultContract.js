@@ -5,7 +5,6 @@ const {
     assertValidStrategyResult
 } = require("../contracts/strategyResultContract");
 const { assertValidDecision } = require("../contracts/decisionContract");
-const { isKnownStrategyId } = require("./strategyIdentifiers");
 
 /**
  * Routing-level strategy result.
@@ -45,12 +44,33 @@ const STRATEGY_OUTCOMES = Object.freeze({
  * @returns {RoutingStrategyResult} Routing strategy result.
  */
 function createRoutingStrategyResult(strategyId, outcome, options = {}) {
+    const responseSource =
+        options.responseSource ||
+        options.decision?.source ||
+        options.metadata?.responseSource ||
+        null;
+    const fallbackReason =
+        outcome === STRATEGY_OUTCOMES.FALLBACK
+            ? options.fallbackReason || options.reason || null
+            : options.fallbackReason || null;
+
     return assertValidRoutingStrategyResult({
         strategyId,
         outcome,
         decision: options.decision || null,
         reason: options.reason || "strategy completed",
-        metadata: options.metadata || {}
+        metadata: {
+            selectedStrategy: strategyId,
+            previousStrategy:
+                options.previousStrategy !== undefined
+                    ? options.previousStrategy
+                    : null,
+            hopCount:
+                options.hopCount !== undefined ? options.hopCount : null,
+            responseSource,
+            fallbackReason,
+            ...(options.metadata || {})
+        }
     });
 }
 
@@ -60,7 +80,7 @@ function createRoutingStrategyResult(strategyId, outcome, options = {}) {
  * @param {Object} result Existing strategy result.
  * @returns {RoutingStrategyResult} Routing-level result.
  */
-function adaptStrategyResult(strategyId, result) {
+function adaptStrategyResult(strategyId, result, options = {}) {
     const validatedResult = assertValidStrategyResult(result);
 
     if (
@@ -70,6 +90,9 @@ function adaptStrategyResult(strategyId, result) {
         return createRoutingStrategyResult(strategyId, STRATEGY_OUTCOMES.RESPOND, {
             decision: validatedResult.decision,
             reason: validatedResult.reason || validatedResult.decision.reason,
+            previousStrategy: options.previousStrategy,
+            hopCount: options.hopCount,
+            responseSource: validatedResult.decision?.source || null,
             metadata: validatedResult.metadata || {}
         });
     }
@@ -77,6 +100,9 @@ function adaptStrategyResult(strategyId, result) {
     if (validatedResult.outcome === STRATEGY_RESULT_OUTCOMES.FALLBACK) {
         return createRoutingStrategyResult(strategyId, STRATEGY_OUTCOMES.FALLBACK, {
             reason: validatedResult.reason || "strategy requested fallback",
+            previousStrategy: options.previousStrategy,
+            hopCount: options.hopCount,
+            fallbackReason: validatedResult.reason || "strategy requested fallback",
             metadata: validatedResult.metadata || {}
         });
     }
@@ -84,12 +110,16 @@ function adaptStrategyResult(strategyId, result) {
     if (validatedResult.outcome === STRATEGY_RESULT_OUTCOMES.END) {
         return createRoutingStrategyResult(strategyId, STRATEGY_OUTCOMES.END, {
             reason: validatedResult.reason || "strategy ended routing",
+            previousStrategy: options.previousStrategy,
+            hopCount: options.hopCount,
             metadata: validatedResult.metadata || {}
         });
     }
 
     return createRoutingStrategyResult(strategyId, STRATEGY_OUTCOMES.CONTINUE, {
         reason: validatedResult.reason || "strategy did not handle the request",
+        previousStrategy: options.previousStrategy,
+        hopCount: options.hopCount,
         metadata: validatedResult.metadata || {}
     });
 }
@@ -104,7 +134,7 @@ function validateRoutingStrategyResult(result) {
         return { valid: false, reason: "routing strategy result must be an object" };
     }
 
-    if (!isKnownStrategyId(result.strategyId)) {
+    if (typeof result.strategyId !== "string" || result.strategyId.trim() === "") {
         return { valid: false, reason: "routing strategy result strategyId is invalid" };
     }
 

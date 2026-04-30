@@ -14,6 +14,11 @@
  * @property {Object} metadata Normalized metadata.
  * @property {Object|null} previousResult Previous routing strategy result.
  * @property {Array<string>} visitedStrategies Strategy ids already executed.
+ * @property {Array<Object>} routeHistory Strategy routing history.
+ * @property {string|null} selectedStrategy Most recently selected strategy.
+ * @property {string|null} previousStrategy Previously executed strategy.
+ * @property {string|null} fallbackReason Fallback reason from the previous hop.
+ * @property {string|null} responseSource Previous response source when available.
  * @property {number} hopCount Current routing hop count.
  */
 
@@ -33,6 +38,29 @@ function createRoutingContext(orchestratorContext, options = {}) {
         visitedStrategies: Array.isArray(options.visitedStrategies)
             ? [...options.visitedStrategies]
             : [],
+        routeHistory: Array.isArray(options.routeHistory)
+            ? options.routeHistory.map((routeHistoryEntry) => ({
+                ...routeHistoryEntry
+            }))
+            : [],
+        selectedStrategy:
+            typeof options.selectedStrategy === "string"
+                ? options.selectedStrategy
+                : null,
+        previousStrategy:
+            typeof options.previousStrategy === "string"
+                ? options.previousStrategy
+                : options.previousResult?.strategyId || null,
+        fallbackReason:
+            typeof options.fallbackReason === "string"
+                ? options.fallbackReason
+                : options.previousResult?.outcome === "FALLBACK"
+                    ? options.previousResult.reason
+                    : null,
+        responseSource:
+            typeof options.responseSource === "string"
+                ? options.responseSource
+                : options.previousResult?.metadata?.responseSource || null,
         hopCount: Number.isInteger(options.hopCount) ? options.hopCount : 0
     };
 }
@@ -70,8 +98,59 @@ function validateRoutingContext(context) {
         };
     }
 
+    if (!Array.isArray(context.routeHistory)) {
+        return {
+            valid: false,
+            reason: "routing context routeHistory must be an array"
+        };
+    }
+
     if (!Number.isInteger(context.hopCount) || context.hopCount < 0) {
         return { valid: false, reason: "routing context hopCount must be valid" };
+    }
+
+    if (
+        context.selectedStrategy !== null &&
+        (typeof context.selectedStrategy !== "string" ||
+            context.selectedStrategy.trim() === "")
+    ) {
+        return {
+            valid: false,
+            reason: "routing context selectedStrategy must be a string or null"
+        };
+    }
+
+    if (
+        context.previousStrategy !== null &&
+        (typeof context.previousStrategy !== "string" ||
+            context.previousStrategy.trim() === "")
+    ) {
+        return {
+            valid: false,
+            reason: "routing context previousStrategy must be a string or null"
+        };
+    }
+
+    if (
+        context.fallbackReason !== null &&
+        (typeof context.fallbackReason !== "string" ||
+            context.fallbackReason.trim() === "")
+    ) {
+        return {
+            valid: false,
+            reason: "routing context fallbackReason must be a string or null"
+        };
+    }
+
+    if (
+        context.responseSource !== null &&
+        (typeof context.responseSource !== "string" ||
+            context.responseSource.trim() === "")
+    ) {
+        return {
+            valid: false,
+            reason: "routing context responseSource must be a string or null"
+        };
     }
 
     if (
